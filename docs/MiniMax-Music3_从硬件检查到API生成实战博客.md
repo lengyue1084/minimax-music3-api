@@ -5,6 +5,7 @@
 ## 一、项目与机器配置
 
 项目目录：/home/alone/workspace/minimax-music3-api
+GitHub 仓库：https://github.com/lengyue1084/minimax-music3-api
 数据目录：/home/alone/workspace/minimax-music3-data
 模型目录：/home/alone/workspace/minimax-music3-data/models/MiniMax/MiniMax-Music3
 
@@ -266,21 +267,7 @@ curl -sS http://部署机局域网IP:8190/v1/system/status | jq
 
 如果连接失败，检查 Ubuntu 防火墙、路由和端口放行；当前接口没有鉴权，不应直接暴露到公网。
 
-## 十五、PyCharm 调试
-
-项目提供 `.idea/runConfigurations/MiniMax_Music3_API_Debug.xml`。PyCharm 中打开项目后，选择 `MiniMax Music3 API (Debug)`，确认解释器是 `.venv/bin/python`，然后点击 Debug。
-
-等价命令：
-
-```bash
-PYTHONPATH="$PWD/src:$PWD/vendor/diffusers/src" \
-  .venv/bin/python -m uvicorn minimax_music3_api.main:app \
-  --host 0.0.0.0 --port 8190 --workers 1
-```
-
-可在 `main.py` 的任务提交/状态更新处，以及 `generator.py` 的模型加载/生成处设置断点。不要增加 worker 数量。
-
-## 十六、日志、监控和清理
+## 十五、日志、监控和清理
 
 查看 JSON 日志：
 
@@ -303,7 +290,7 @@ du -sh /home/alone/workspace/minimax-music3-data/outputs
 
 不要在任务运行期间删除对应 job JSON 或输出文件。确认任务已完成后，再按任务 ID 清理旧 WAV 和日志，避免磁盘逐渐耗尽。
 
-## 十七、排障决策表
+## 十六、排障决策表
 
 | 现象 | 判断 | 处理 |
 |---|---|---|
@@ -318,13 +305,13 @@ du -sh /home/alone/workspace/minimax-music3-data/outputs
 | HTTP 422 | 字段、范围或时长不合法 | 按字段表修正 |
 | HTTP 429 | 8 个等待槽已满 | 等待已有任务完成 |
 
-## 十八、性能和并发边界
+## 十七、性能和并发边界
 
 当前服务允许多个请求进入队列，但只运行一个 GPU 推理任务。增加并发不会加快单任务，增加 Uvicorn worker 还会复制模型并放大内存压力。本机实测 15 秒约 11 分钟、120 秒约 75 分钟，主要瓶颈是 16GB 显存、CPU/GPU 搬运和 swap。
 
 因此建议：先用 5～10 秒请求验证；确认歌词、风格和模型结果后再提交长任务；长任务使用异步接口；运行期间持续观察 RAM、swap 和 GPU 利用率。
 
-## 十九、完整复现清单
+## 十八、完整复现清单
 
 ```bash
 sudo swapon /swapfile-minimax-h3
@@ -345,7 +332,7 @@ curl -fL -o result.wav http://127.0.0.1:8190/v1/jobs/$JOB_ID/result
 ffprobe -v error -show_entries format=duration,size:stream=codec_name,codec_type,sample_rate,channels,bits_per_sample -of json result.wav
 ```
 
-## 二十、附录：本次完整歌曲请求文件
+## 十九、附录：本次完整歌曲请求文件
 
 下面的请求文件对应本文记录的真实任务。保存前请确认 JSON 中的换行使用 `\n`，不要把未转义的多行字符串直接放在双引号内。
 
@@ -393,7 +380,7 @@ curl -fL \
   "http://127.0.0.1:8190/v1/jobs/${JOB_ID}/result"
 ```
 
-## 二十一、附录：按分钟级任务运行的注意事项
+## 二十、附录：按分钟级任务运行的注意事项
 
 120 秒任务在本机实际耗时约 75 分钟。提交长任务前建议：
 
@@ -406,6 +393,6 @@ curl -fL \
 
 如果客户端断线，任务不会因此停止；重新连接服务后继续查询原任务 ID 即可。只有状态为 `succeeded` 且 `output` 文件存在时，才执行下载和 ffprobe 验收。
 
-## 二十二、最终总结
+## 二十一、最终总结
 
 这套部署证明了在 RTX 4060 Ti 16GB、32GB RAM 的 Ubuntu 主机上，可以使用 ModelScope 下载的全量 MiniMax-Music3 权重完成中文歌词歌曲生成。关键条件是：模型文件完整、Diffusers 组件使用本地路径、启用 CPU/offload、配置足够 swap、单 worker 串行推理，并在生成结束后检查音频编码和实际时长。当前实现已经覆盖请求日志、任务持久化、异常恢复和 Tensor/NumPy 两种输出格式，适合作为本地化部署和效果评估基线。
