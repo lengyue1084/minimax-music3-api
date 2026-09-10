@@ -1,0 +1,13 @@
+.venv/
+.idea/*
+!.idea/runConfigurations/
+!.idea/runConfigurations/*.xml
+__pycache__/
+data/
+logs/
+outputs/
+*.wav
+
+# The vendored runtime source is required, but its upstream test suite is not
+# needed to deploy Music3 and can trigger GitHub secret-scanning false positives.
+vendor/diffusers/tests/

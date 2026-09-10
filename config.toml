@@ -1,0 +1,20 @@
+[server]
+host = "0.0.0.0"
+port = 8190
+
+[model]
+path = "/home/alone/workspace/minimax-music3-data/models/MiniMax/MiniMax-Music3"
+device = "cuda"
+dtype = "bfloat16"
+cpu_offload = true
+language_model_streaming = true
+
+[generation]
+max_duration_seconds = 300.0
+max_queue_size = 8
+
+[storage]
+output_dir = "/home/alone/workspace/minimax-music3-data/outputs"
+job_dir = "/home/alone/workspace/minimax-music3-data/jobs"
+log_file = "/home/alone/workspace/minimax-music3-data/logs/api.jsonl"
+
