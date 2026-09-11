@@ -14,6 +14,7 @@
 
 import numpy as np
 import torch
+from collections.abc import Callable
 
 from ...models import MiniMaxMusic3Vocoder
 from ...utils import logging
@@ -55,6 +56,12 @@ class MiniMaxMusic3VocoderDecodeStep(ModularPipelineBlocks):
                 description="List of per-window denoised latent tensors (uncropped). Can be generated in denoise step.",
             ),
             InputParam("output_type", default="np", type_hint=str, description="Output format: 'np' or 'pt'."),
+            InputParam(
+                "progress_callback",
+                default=None,
+                type_hint=Callable,
+                description="Optional callback receiving stage, current unit, and total units.",
+            ),
         ]
 
     @property
@@ -79,12 +86,17 @@ class MiniMaxMusic3VocoderDecodeStep(ModularPipelineBlocks):
 
         hop_length = components.latent_hop_length
         num_chunks = len(block_state.latent_chunks)
+        progress_callback = block_state.progress_callback
+        if progress_callback:
+            progress_callback("decode", 0, num_chunks)
         waveform_chunks = []
         for chunk_index, latents in enumerate(block_state.latent_chunks):
             waveform = components.vocoder(latents.to(components.vocoder.dtype))
             left = 0 if chunk_index == 0 else _CROP_LEFT_LATENT * hop_length
             right = 0 if chunk_index == num_chunks - 1 else _CROP_RIGHT_LATENT * hop_length
             waveform_chunks.append(waveform[..., left : waveform.shape[-1] - right])
+            if progress_callback:
+                progress_callback("decode", chunk_index + 1, num_chunks)
 
         audios = torch.cat(waveform_chunks, dim=-1).float().clamp(-1.0, 1.0)
         if block_state.output_type == "np":

@@ -14,6 +14,7 @@
 
 import numpy as np
 import torch
+from collections.abc import Callable
 
 from ...configuration_utils import FrozenDict
 from ...guiders import ClassifierFreeGuidance
@@ -279,6 +280,12 @@ class MiniMaxMusic3ChunkLoopWrapper(LoopSequentialPipelineBlocks):
                 type_hint=list,
                 description="Frame index at which each 200-frame denoising window starts.",
             ),
+            InputParam(
+                "progress_callback",
+                default=None,
+                type_hint=Callable,
+                description="Optional callback receiving stage, current unit, and total units.",
+            ),
         ]
 
     @property
@@ -300,10 +307,16 @@ class MiniMaxMusic3ChunkLoopWrapper(LoopSequentialPipelineBlocks):
         block_state.previous_condition = None
 
         num_chunks = len(block_state.chunk_starts)
+        progress_callback = block_state.progress_callback
+        total_steps = num_chunks * block_state.num_inference_steps
+        if progress_callback:
+            progress_callback("denoise", 0, total_steps)
         with self.progress_bar(total=num_chunks * block_state.num_inference_steps) as progress_bar:
             block_state.progress_bar = progress_bar
             for k in range(num_chunks):
                 components, block_state = self.loop_step(components, block_state, k=k)
+                if progress_callback:
+                    progress_callback("denoise", (k + 1) * block_state.num_inference_steps, total_steps)
         block_state.progress_bar = None
 
         self.set_block_state(state, block_state)

@@ -36,5 +36,9 @@ class JobStatus(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     elapsed_seconds: float | None = None
+    stage: Literal["queued", "loading", "semantic", "denoise", "decode", "saving", "completed", "failed"] = "queued"
+    progress_current: int = Field(default=0, ge=0)
+    progress_total: int = Field(default=0, ge=0)
+    progress_percent: float = Field(default=0.0, ge=0.0, le=100.0)
     output: str | None = None
     error: str | None = None

@@ -219,6 +219,10 @@ curl -sS "http://127.0.0.1:8190/v1/jobs/$JOB_ID" | jq
 | `started_at` | 开始处理时间 |
 | `completed_at` | 完成或失败时间 |
 | `elapsed_seconds` | 实际处理秒数 |
+| `stage` | 当前阶段：加载、语义帧生成、扩散、解码、保存或完成 |
+| `progress_current` | 当前阶段已完成的真实帧数、步数或分块数 |
+| `progress_total` | 当前阶段总帧数、步数或分块数 |
+| `progress_percent` | 映射后的总体进度百分比 |
 | `output` | 成功时的 WAV 绝对路径 |
 | `error` | 失败时的错误文本 |
 
@@ -227,7 +231,7 @@ curl -sS "http://127.0.0.1:8190/v1/jobs/$JOB_ID" | jq
 ```bash
 while :; do
   BODY=$(curl -fsS "http://127.0.0.1:8190/v1/jobs/$JOB_ID")
-  echo "$BODY" | jq '{status,elapsed_seconds,error,output}'
+  echo "$BODY" | jq '{status,stage,progress_current,progress_total,progress_percent,elapsed_seconds,error,output}'
   STATUS=$(echo "$BODY" | jq -r '.status')
   case "$STATUS" in
     succeeded|failed) break ;;

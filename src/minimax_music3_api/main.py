@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import subprocess
+import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -45,9 +46,14 @@ def configure_logging(settings: Settings) -> logging.Logger:
     logger = logging.getLogger("minimax_music3_api")
     logger.setLevel(logging.INFO)
     if not logger.handlers:
-        handler = logging.FileHandler(settings.log_file, encoding="utf-8")
-        handler.setFormatter(JsonFormatter())
-        logger.addHandler(handler)
+        formatter = JsonFormatter()
+        file_handler = logging.FileHandler(settings.log_file, encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+        logger.propagate = False
     return logger
 
 
@@ -128,7 +134,23 @@ class JobManager:
                 self.jobs[job_id] = job
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
+        if job.status == "running" and job.started_at:
+            job.elapsed_seconds = round((utc_now() - job.started_at).total_seconds(), 3)
         return job
+
+    @staticmethod
+    def _overall_percent(stage: str, current: int, total: int) -> float:
+        """Map real per-stage counters onto a monotonic overall percentage."""
+        ratio = min(max(current / total, 0.0), 1.0) if total else 0.0
+        ranges = {
+            "loading": (0.0, 2.0),
+            "semantic": (2.0, 80.0),
+            "denoise": (80.0, 98.0),
+            "decode": (98.0, 99.0),
+            "saving": (99.0, 100.0),
+        }
+        start, end = ranges.get(stage, (0.0, 0.0))
+        return round(start + (end - start) * ratio, 2)
 
     def _persist(self, job: JobStatus, request: SpeechRequest | None = None) -> None:
         job_path = self.settings.job_dir / f"{job.id}.json"
@@ -145,10 +167,33 @@ class JobManager:
             started = time.monotonic()
             job.status = "running"
             job.started_at = utc_now()
+            job.stage = "loading"
             self._persist(job)
 
             try:
                 output_path = self.settings.output_dir / f"{job_id}.wav"
+                progress_state = {"last_persisted": 0.0, "last_logged_bucket": -1}
+
+                def update_progress(stage: str, current: int, total: int) -> None:
+                    job.stage = stage
+                    job.progress_current = current
+                    job.progress_total = total
+                    job.progress_percent = self._overall_percent(stage, current, total)
+                    job.elapsed_seconds = round(time.monotonic() - started, 3)
+
+                    now = time.monotonic()
+                    bucket = int(job.progress_percent // 5)
+                    should_persist = now - progress_state["last_persisted"] >= 2 or current == total
+                    if should_persist:
+                        self._persist(job)
+                        progress_state["last_persisted"] = now
+                    if bucket > progress_state["last_logged_bucket"] or current == total:
+                        self.logger.info(
+                            "generation progress",
+                            extra={"event": "progress", "data": job.model_dump(mode="json")},
+                        )
+                        progress_state["last_logged_bucket"] = bucket
+
                 await asyncio.to_thread(
                     self.generator.generate,
                     lyrics=request.input,
@@ -156,11 +201,17 @@ class JobManager:
                     duration_seconds=request.requested_duration(),
                     seed=request.seed,
                     output_path=output_path,
+                    progress_callback=update_progress,
                 )
                 job.status = "succeeded"
+                job.stage = "completed"
+                job.progress_current = 1
+                job.progress_total = 1
+                job.progress_percent = 100.0
                 job.output = str(output_path)
             except Exception as exc:
                 job.status = "failed"
+                job.stage = "failed"
                 job.error = f"{type(exc).__name__}: {exc}"
                 self.logger.exception(
                     "generation failed", extra={"event": "failure", "data": {"job": job_id}}

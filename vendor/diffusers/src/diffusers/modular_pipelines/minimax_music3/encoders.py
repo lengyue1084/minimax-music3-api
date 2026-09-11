@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+from collections.abc import Callable
 from typing import Optional
 
 import torch
@@ -258,6 +259,12 @@ class MiniMaxMusic3SemanticGenerationStep(ModularPipelineBlocks):
                 ),
             ),
             InputParam.template("generator"),
+            InputParam(
+                "progress_callback",
+                default=None,
+                type_hint=Callable,
+                description="Optional callback receiving stage, current unit, and total units.",
+            ),
         ]
 
     @property
@@ -291,6 +298,9 @@ class MiniMaxMusic3SemanticGenerationStep(ModularPipelineBlocks):
                 f"(1 / {components.frame_rate} s)"
             )
         generator = block_state.generator
+        progress_callback = block_state.progress_callback
+        if progress_callback:
+            progress_callback("semantic", 0, max_frames)
 
         language_model = components.language_model
         # Trigger CPU-offload hooks by hand (same workaround as minimax_h3): the autoregressive loop calls
@@ -341,6 +351,8 @@ class MiniMaxMusic3SemanticGenerationStep(ModularPipelineBlocks):
             )
             if frame_index > 0:
                 frame_hiddens.append(torch.cat((last_hidden[:1], depth_hidden), dim=-1))
+                if progress_callback:
+                    progress_callback("semantic", len(frame_hiddens), max_frames)
                 if len(frame_hiddens) >= max_frames:
                     break
             feedback = _embed_audio_frame(components, frame_codes)

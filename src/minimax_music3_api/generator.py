@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import threading
+from collections.abc import Callable
 
 import numpy as np
 
@@ -62,10 +63,22 @@ class MusicGenerator:
         if changed:
             manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    def generate(self, lyrics: str, instructions: str, duration_seconds: float, seed: int, output_path: Path) -> Path:
+    def generate(
+        self,
+        lyrics: str,
+        instructions: str,
+        duration_seconds: float,
+        seed: int,
+        output_path: Path,
+        progress_callback: Callable[[str, int, int], None] | None = None,
+    ) -> Path:
         import soundfile as sf
         import torch
+        if progress_callback:
+            progress_callback("loading", 0, 1)
         self.load()
+        if progress_callback:
+            progress_callback("loading", 1, 1)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with self.generate_lock, torch.inference_mode():
             generator = torch.Generator(self.settings.device).manual_seed(seed)
@@ -75,6 +88,7 @@ class MusicGenerator:
                 audio_duration=duration_seconds,
                 generator=generator,
                 output="audios",
+                progress_callback=progress_callback,
             )[0]
             # Diffusers may return either a torch tensor or a NumPy array depending on
             # the pipeline/output configuration. Normalize both to soundfile's
@@ -83,5 +97,9 @@ class MusicGenerator:
                 samples = audio.T.float().cpu().numpy()
             else:
                 samples = np.asarray(audio).T.astype("float32", copy=False)
+            if progress_callback:
+                progress_callback("saving", 0, 1)
             sf.write(output_path, samples, self.pipeline.sampling_rate, subtype="PCM_16")
+            if progress_callback:
+                progress_callback("saving", 1, 1)
         return output_path

@@ -68,7 +68,12 @@ curl -fL -o music3-$JOB_ID.wav \
   "http://127.0.0.1:8190/v1/jobs/$JOB_ID/result"
 ```
 
-任务 `status` 枚举：`queued`、`running`、`succeeded`、`failed`。其他字段：`created_at`、`started_at`、`completed_at`、`elapsed_seconds`、`output`、`error`。
+任务 `status` 枚举：`queued`、`running`、`succeeded`、`failed`。进度字段为 `stage`、`progress_current`、`progress_total` 和 `progress_percent`；`stage` 枚举为 `queued`、`loading`、`semantic`、`denoise`、`decode`、`saving`、`completed`、`failed`。其中 `semantic` 按真实生成帧计数，`denoise` 按真实扩散步数计数。其他字段：`created_at`、`started_at`、`completed_at`、`elapsed_seconds`、`output`、`error`。
+
+```bash
+curl -sS "http://127.0.0.1:8190/v1/jobs/$JOB_ID" \
+  | jq '{status,stage,progress_current,progress_total,progress_percent,elapsed_seconds,error,output}'
+```
 
 验收：
 
