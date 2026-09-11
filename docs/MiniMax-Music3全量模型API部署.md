@@ -53,7 +53,7 @@ chmod +x scripts/*.sh
 ./scripts/01_prepare_env.sh
 ```
 
-项目已在 `vendor/diffusers` 固定保存包含 Music3 集成的官方 Diffusers 提交，启动时从本地源码加载，不需要重复从 GitHub 克隆。由于本机已有兼容的 CUDA 运行库，安装脚本通过 `.pth` 只读复用旧 H3 环境的 Python 包，避免再次下载数 GB 的 PyTorch CUDA wheel；代码和模型目录仍保持独立。
+项目已在 `vendor/diffusers` 固定保存包含 Music3 集成的官方 Diffusers 提交，启动时从本地源码加载，不需要重复从 GitHub 克隆。Music3 使用项目自己的 Python 依赖环境，避免旧 H3 环境中的包版本污染；代码和模型目录保持独立。
 
 ## 下载全量权重
 
