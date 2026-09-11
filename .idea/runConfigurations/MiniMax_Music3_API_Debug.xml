@@ -5,6 +5,7 @@
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="MUSIC3_CONFIG" value="$PROJECT_DIR$/config.toml" />
+      <env name="MUSIC3_PORT" value="8190" />
       <env name="PYTHONPATH" value="$PROJECT_DIR$/src:$PROJECT_DIR$/vendor/diffusers/src" />
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
